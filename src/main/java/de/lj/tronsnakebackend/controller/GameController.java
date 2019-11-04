@@ -3,7 +3,7 @@ package de.lj.tronsnakebackend.controller;
 import de.lj.tronsnakebackend.model.Client;
 import de.lj.tronsnakebackend.service.GameService;
 import de.lj.tronsnakebackend.service.game.GameConstants;
-import de.lj.tronsnakebackend.websocket.message.*;
+import de.lj.tronsnakebackend.model.dto.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.handler.annotation.Header;
@@ -31,16 +31,15 @@ public class GameController implements GameConstants {
     }
 
     @MessageMapping("/direction")
-    public void updatePlayerDirection(@Payload DirectionMessage directionMessage,
+    public void updatePlayerDirection(@Payload DirectionDto directionDto,
                              @Header(value = "simpSessionId") String sessionId) {
         Client client = gameService.getClientForSessionId(sessionId);
-        gameService.updatePlayerDirectionForClient(directionMessage.getDirection(), client);
+        gameService.updateDirectionForClient(directionDto.getDirection(), client);
     }
 
     @MessageMapping("/join")
-    public void joinGame(@Payload JoinMessage joinMessage, MessageHeaders messageHeaders, @Header(value = "simpSessionId") String sessionId) {
-        Client client = new Client(joinMessage.getName(), messageHeaders, sessionId);
+    public void joinGame(@Payload JoinDto joinDto, MessageHeaders messageHeaders, @Header(value = "simpSessionId") String sessionId) {
+        Client client = new Client(joinDto.getName(), messageHeaders, sessionId);
         gameService.addPlayerForClient(client);
     }
-
 }

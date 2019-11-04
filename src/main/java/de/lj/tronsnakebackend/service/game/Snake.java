@@ -1,47 +1,41 @@
 package de.lj.tronsnakebackend.service.game;
 
-import de.lj.tronsnakebackend.service.game.assets.MyRandom;
 import de.lj.tronsnakebackend.service.game.assets.MyVector;
-import de.lj.tronsnakebackend.service.game.player.DirectionType;
 
-public class Snake implements GameConstants {
+public class Snake {
 
-    private DirectionType direction;
-    private MyVector position;
+    private MyVector previousPosition;
+    private MyVector currentPosition;
+    private MyVector direction;
+    private String color;
 
-    public Snake(int x, int y) {
-        this.position = new MyVector(x, y);
-        this.direction = DirectionType.values()[MyRandom.generateInt(0,3)];
+    public Snake(MyVector currentPosition, MyVector direction, String color) {
+        this.previousPosition = currentPosition;
+        this.currentPosition = currentPosition;
+        this.direction = direction;
+        this.color = color;
     }
 
     public void move() {
-        this.position = position.plus(direction.getDirection());
+        previousPosition = currentPosition;
+        currentPosition = currentPosition.plus(direction);
     }
 
-    public boolean validDirection(DirectionType inputDirection) {
-        switch(direction) {
-            case UP:
-                return (inputDirection != DirectionType.DOWN);
-            case DOWN:
-                return (inputDirection != DirectionType.UP);
-            case LEFT:
-                return (inputDirection != DirectionType.RIGHT);
-            case RIGHT:
-                return  (inputDirection != DirectionType.LEFT);
-            default:
-                return false;
+    public MyVector peekPosition() {
+        return currentPosition.plus(direction);
+    }
+
+    public void updateDirection(MyVector newDirection) {
+        if(!currentPosition.plus(newDirection).equals(previousPosition)) {
+            direction = newDirection;
         }
     }
 
-    public MyVector getPosition() {
-        return position;
+    public MyVector getCurrentPosition() {
+        return currentPosition;
     }
 
-    public void setDirection(DirectionType direction) {
-        this.direction = direction;
-    }
-
-    public DirectionType getDirection() {
-        return direction;
+    public String getColor() {
+        return color;
     }
 }

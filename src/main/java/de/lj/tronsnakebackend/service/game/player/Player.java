@@ -1,28 +1,30 @@
 package de.lj.tronsnakebackend.service.game.player;
 
-import de.lj.tronsnakebackend.service.game.GameConstants;
 import de.lj.tronsnakebackend.service.game.Snake;
+import de.lj.tronsnakebackend.service.game.assets.MyVector;
 
-public abstract class Player implements GameConstants {
+public abstract class Player {
 
     private String name;
     private boolean active;
-    private String color;
 
     private Snake snake;
 
     public Player(String name) {
         this.name = name;
-        this.snake = new Snake(
-                (int) Math.floor(Math.random()*FIELD_WIDTH),
-                (int) Math.floor(Math.random()*FIELD_HEIGHT)
-        );
         this.active = true;
-        this.color = "black";
+    }
+
+    public MyVector getSnakePosition() {
+        return this.snake.getCurrentPosition();
     }
 
     public String getName() {
         return name;
+    }
+
+    public void setSnake(Snake snake) {
+        this.snake = snake;
     }
 
     public Snake getSnake() {
@@ -37,17 +39,4 @@ public abstract class Player implements GameConstants {
         this.active = active;
     }
 
-    public String getColor() {
-        return color;
-    }
-
-    public void setColor(String color) {
-        this.color = color;
-    }
-
-    public void updateDirection(DirectionType direction) {
-        if(this.getSnake().validDirection(direction)) {
-            this.getSnake().setDirection(direction);
-        }
-    };
 }

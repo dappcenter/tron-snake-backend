@@ -3,10 +3,12 @@ package de.lj.tronsnakebackend.service.game;
 public class Square {
 
     private String color;
+    private boolean blocked;
     private int index;
 
     public Square(int index) {
         this.index = index;
+        this.color = "white";
     }
 
     public int getIndex() {
@@ -14,7 +16,11 @@ public class Square {
     }
 
     public boolean isBlocked() {
-        return color != null;
+        return blocked;
+    }
+
+    public void setBlocked(boolean blocked) {
+        this.blocked = blocked;
     }
 
     public void setColor(String color) {

@@ -3,19 +3,21 @@ package de.lj.tronsnakebackend.service;
 import de.lj.tronsnakebackend.model.Client;
 import de.lj.tronsnakebackend.service.game.Game;
 import de.lj.tronsnakebackend.service.game.GameConstants;
+import de.lj.tronsnakebackend.service.game.Square;
 import de.lj.tronsnakebackend.service.game.player.DirectionType;
 import de.lj.tronsnakebackend.service.game.player.Human;
 import de.lj.tronsnakebackend.service.game.player.Player;
-import de.lj.tronsnakebackend.websocket.message.ColorMessage;
-import de.lj.tronsnakebackend.websocket.message.GameOverMessage;
-import de.lj.tronsnakebackend.websocket.message.SquareUpdateMessage;
-import de.lj.tronsnakebackend.websocket.message.StartGameMessage;
+import de.lj.tronsnakebackend.model.dto.ColorDto;
+import de.lj.tronsnakebackend.model.dto.PlayerDto;
+import de.lj.tronsnakebackend.model.dto.SquareDto;
+import de.lj.tronsnakebackend.model.dto.CountdownDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class GameService implements GameConstants {
@@ -23,8 +25,10 @@ public class GameService implements GameConstants {
     private BroadcastScheduler broadcastScheduler;
     private SimpMessagingTemplate messagingTemplate;
 
-    private List<Game> games = new ArrayList<>();
+    private List<Game> pendingGames = new ArrayList<>();
+    private List<Client> clients = new ArrayList<>();
     private Map<Client, Player> clientPlayerMap = new IdentityHashMap<>();
+    private Map<Client, Game> clientGameMap = new IdentityHashMap<>();
 
     @Autowired
     public GameService(BroadcastScheduler broadcastScheduler,
@@ -34,44 +38,71 @@ public class GameService implements GameConstants {
     }
 
     @SendToUser
+    private synchronized void sendGameOverMessage(List<Client> clients, Player winner) {
+        PlayerDto message = new PlayerDto();
+        message.setName((winner == null) ? "Nobody" : winner.getName());
+        message.setColor((winner == null) ? "white" : winner.getSnake().getColor());
+
+        for (Client client : clients) {
+            messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/game_over", message, client.getMessageHeaders());
+        }
+    }
+
+    @SendToUser
+    private synchronized void sendSquareUpdateMessage(List<Client> clients, List<Square> squares) {
+        List<SquareDto> message = new Vector<>();
+        squares.parallelStream().forEach(square -> message.add(new SquareDto(square.getIndex(), square.getColor())));
+
+        for (Client client : clients) {
+            messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/update_squares", message, client.getMessageHeaders());
+        }
+    }
+
+    @SendToUser
+    private synchronized void sendCountdownMessage(List<Client> clients, short count) {
+        CountdownDto message = new CountdownDto(count);
+
+        for (Client client : clients) {
+            messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/countdown", message, client.getMessageHeaders());
+        }
+    }
+
+    @SendToUser
+    private synchronized void sendColorMessage(Client client, String color) {
+        ColorDto colorDto = new ColorDto(color);
+
+        messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/get_color", colorDto, client.getMessageHeaders());
+    }
+
     private Runnable broadcastGame(Game game) {
-        final List<Client> clients = getClientsForGame(game);
         return new Runnable() {
+            final List<Client> clients = getClientsForGame(game);
+            final Vector<Square> blockedSquares = new Vector<>();
+
             @Override
             public void run() {
                 if (game.isOver()) {
                     Player winner = game.getWinner();
-                    for (Client client : clients) {
-                        GameOverMessage message = new GameOverMessage(winner == null ? "Nobody" : winner.getName());
-                        messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/game_over", message, client.getMessageHeaders());
-                    }
+                    sendGameOverMessage(clients, winner);
                     broadcastScheduler.cancelBroadcast(this);
-                    clients.parallelStream().forEach(client -> clientPlayerMap.remove(client));
-                    games.remove(game);
+                    removeClients(clients);
                 } else {
                     game.nextTurn();
-                    for (Client client : clients) {
-                        SquareUpdateMessage message = new SquareUpdateMessage(game.getChangedSquares());
-                        messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/update_squares", message, client.getMessageHeaders());
-                    }
+                    sendSquareUpdateMessage(clients, game.getUpdatedSquares());
                 }
             }
         };
     }
 
-    @SendToUser
     private Runnable broadcastCountdown(Game game) {
-        final List<Client> clients = getClientsForGame(game);
-
         return new Runnable() {
+            final List<Client> clients = getClientsForGame(game);
             short count = GAME_COUNTDOWN;
+
             @Override
             public void run() {
-                if(count-- > 0) {
-                    for(Client client : clients) {
-                        StartGameMessage message = new StartGameMessage(count);
-                        messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/countdown", message, client.getMessageHeaders());
-                    }
+                if (count-- > 0) {
+                    sendCountdownMessage(clients, count);
                 } else {
                     broadcastScheduler.cancelBroadcast(this);
                     scheduleBroadcastGame(game);
@@ -80,71 +111,73 @@ public class GameService implements GameConstants {
         };
     }
 
+    private void scheduleBroadcastCountdown(Game game) {
+        broadcastScheduler.scheduleWithFixedDelay(broadcastCountdown(game), 1000);
+    }
+
+    private void scheduleBroadcastGame(Game game) {
+        broadcastScheduler.scheduleWithFixedDelay(broadcastGame(game), GAME_UPDATE_TIME);
+    }
+
+    private void removeClients(List<Client> clients) {
+        clients.parallelStream().forEach(client -> {
+            clientGameMap.remove(client);
+            clientPlayerMap.remove(client);
+            this.clients.remove(client);
+        });
+    }
+
     private List<Client> getClientsForGame(Game game) {
-        List<Client> clients = new ArrayList<>();
-
-        for (Player player : game.getPlayers()) {
-            clientPlayerMap.entrySet().parallelStream()
-                    .filter(entrySet -> entrySet.getValue().equals(player))
-                    .map(Map.Entry::getKey)
-                    .findAny().ifPresent(clients::add);
-        }
-
-        return clients;
+        return clientGameMap.entrySet().parallelStream()
+                .filter((entry) -> entry.getValue().equals(game))
+                .map((Map.Entry::getKey))
+                .collect(Collectors.toList());
     }
 
     private Player getPlayerForClient(Client client) {
         return clientPlayerMap.getOrDefault(client, null);
     }
 
-    public Client getClientForSessionId(String sessionId) {
-        return clientPlayerMap.keySet().parallelStream()
+    public synchronized Client getClientForSessionId(String sessionId) {
+        return clients.parallelStream()
                 .filter(client -> client.getSessionId().equals(sessionId))
                 .findAny().orElse(null);
     }
 
-    public void updatePlayerDirectionForClient(DirectionType direction, Client client) {
+    public void updateDirectionForClient(DirectionType direction, Client client) {
         Player player = getPlayerForClient(client);
-        if (player != null) {
-            player.updateDirection(direction);
+        if (player != null && player.isActive()) {
+            player.getSnake().updateDirection(direction.getValue());
         }
     }
 
     public void removePlayerForClient(Client client) {
-        Player player = getPlayerForClient(client);
-        player.setActive(false);
+        clientPlayerMap.get(client).setActive(false);
     }
 
-    @SendToUser
     public void addPlayerForClient(Client client) {
-        Game game = getGameWithCapacity();
-        Player player = new Human(client.getName());
+        clients.add(client);
 
-        game.addPlayer(player);
+        Player player = new Human(client.getName());
         clientPlayerMap.put(client, player);
 
-        ColorMessage message = new ColorMessage(player.getColor());
-        messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/get_color", message, client.getMessageHeaders());
+        Game game = getPendingGame();
+        game.addPlayer(player);
+        clientGameMap.put(client, game);
 
-        if (game.playerCount() == MAX_PLAYER_COUNT) {
+        sendColorMessage(client, player.getSnake().getColor());
+        sendSquareUpdateMessage(getClientsForGame(game), game.getUpdatedSquares());
+
+        if (game.isFull()) {
+            pendingGames.remove(game);
             scheduleBroadcastCountdown(game);
         }
     }
 
-    private void scheduleBroadcastCountdown(Game game) {
-        broadcastScheduler.scheduleAtFixedRate(broadcastCountdown(game), 1000);
-    }
-
-    private void scheduleBroadcastGame(Game game) {
-        broadcastScheduler.scheduleAtFixedRate(broadcastGame(game), GAME_UPDATE_TIME);
-    }
-
-    private Game getGameWithCapacity() {
-        Game game = games.parallelStream()
-                .filter(g -> g.playerCount() < MAX_PLAYER_COUNT)
-                .findAny().orElse(new Game());
-        if (game.playerCount() == 0) {
-            games.add(game);
+    private Game getPendingGame() {
+        Game game = pendingGames.size() > 0 ? pendingGames.get(0) : new Game();
+        if (!pendingGames.contains(game)) {
+            pendingGames.add(game);
         }
         return game;
     }

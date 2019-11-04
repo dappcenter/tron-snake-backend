@@ -1,0 +1,15 @@
+FROM maven:3.6.2-jdk-8 as maven
+
+COPY ./pom.xml ./pom.xml
+RUN mvn dependency:go-offline -B
+
+COPY ./src ./src
+RUN mvn package
+
+FROM openjdk:8-jre-alpine
+WORKDIR /usr/src/tron-snake-backend
+
+EXPOSE 7070
+
+COPY --from=maven target/tron-snake-backend-*.jar ./tron-snake-backend.jar
+CMD ["java", "-jar", "tron-snake-backend.jar"]

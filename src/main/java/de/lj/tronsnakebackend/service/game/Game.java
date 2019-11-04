@@ -2,69 +2,93 @@ package de.lj.tronsnakebackend.service.game;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import de.lj.tronsnakebackend.service.game.assets.MyVector;
 import de.lj.tronsnakebackend.service.game.player.Player;
 
-/**
- * model.Game handles the data processing and implements the rules for this game.
- * A player is deactivated if he runs into the wall or another snake. if both player collide
- * frontally both players are deactivated. game is over if only one or no player is still actively
- * moving.
- */
 public class Game implements GameConstants {
 
-    private Field field;
+    private Field field = new Field();
     private List<Player> players = new ArrayList<>();
-    private List<Square> changedSquares = new ArrayList<>();
+    private List<Square> updatedSquares = new Vector<>();
 
-    public Game() {
-        this.field = new Field(FIELD_WIDTH, FIELD_HEIGHT);
-    }
-
-    // add a player to the game if game isnt full yet
     public void addPlayer(Player player) {
-        if (players.size() < MAX_PLAYER_COUNT) {
-            player.setColor(PLAYER_COLORS[playerCount()]);
+        int index = players.size();
+        if (index < MAX_PLAYER_COUNT) {
+            MyVector position = STARTING_POSITIONS[index];
+            MyVector direction = STARTING_DIRECTIONS[index].getValue();
+            String color = SNAKE_COLORS[index];
+
+            Snake snake = new Snake(position, direction, color);
+            player.setSnake(snake);
             players.add(player);
-            field.getSquareAt(player.getSnake().getPosition()).setColor(player.getColor());
+
+            blockSquare(position);
+            colorSquare(position, color);
+
+            snake.move();
+            blockSquare(position.plus(direction));
+            colorSquare(position.plus(direction), "black");
         }
     }
 
-    // is called by the game controller after every user input to handle collision checking and
-    // updating the positions of the snakes
-    public void nextTurn() {
-        moveSnakes();
-        handleCollisions();
-        blockCells();
-    }
+    public synchronized void nextTurn() {
+        final List<MyVector> nextPositions =
+                getActivePlayersStream()
+                        .map(Player::getSnake)
+                        .map(Snake::peekPosition)
+                        .collect(Collectors.toList());
 
-    private void moveSnakes() {
+        updatedSquares.clear();
+
+        getActivePlayersStream()
+                .forEach(player -> {
+                    MyVector nextPosition = player.getSnake().peekPosition();
+                    player.setActive(!(wallCollision(nextPosition) || blockedCellCollision(nextPosition)));
+                });
+
+        getActivePlayersStream()
+                .forEach(player -> {
+                    Snake snake = player.getSnake();
+                    MyVector nextPosition = snake.peekPosition();
+                    if (frontalCollision(nextPosition, nextPositions)) {
+                        moveSnake(snake);
+                        player.setActive(false);
+                    }
+                });
+
         getActivePlayersStream()
             .map(Player::getSnake)
-            .forEach(Snake::move);
+                .forEach(this::moveSnake);
     }
 
-    // set a cell to blocked, if a snakes moves upon it
-    private void blockCells() {
-        changedSquares.clear();
-        getActivePlayersStream().forEach(player -> {
-            MyVector position = player.getSnake().getPosition();
-            Square square = field.getSquareAt(position);
-            if (square != null) {
-                square.setColor(player.getColor());
-                changedSquares.add(square);
-            }
-        });
+    private void moveSnake(Snake snake) {
+        MyVector currentPosition = snake.getCurrentPosition();
+        MyVector nextPosition = snake.peekPosition();
+
+        colorSquare(currentPosition, snake.getColor());
+        snake.move();
+        blockSquare(nextPosition);
+        colorSquare(nextPosition, "black");
     }
 
-    private void handleCollisions() {
-        getActivePlayersStream().forEach(player -> {
-            MyVector position = player.getSnake().getPosition();
-            player.setActive(!(wallCollision(position) || blockedCellCollision(position)));
-        });
+    private void colorSquare(MyVector position, String color) {
+        Square square = field.getSquareAt(position);
+        square.setColor(color);
+        updatedSquares.add(square);
+    }
+
+    private void blockSquare(MyVector position) {
+        Square square = field.getSquareAt(position);
+        square.setBlocked(true);
+        updatedSquares.add(square);
+    }
+
+    private boolean frontalCollision(MyVector nextPosition, List<MyVector> nextPositions) {
+        return nextPositions.parallelStream().filter(position -> position.equals(nextPosition)).count() > 1;
     }
 
     private boolean wallCollision(MyVector position) {
@@ -72,29 +96,19 @@ public class Game implements GameConstants {
     }
 
     private boolean blockedCellCollision(MyVector position) {
-        Square square = field.getSquareAt(position);
-        return square != null && square.isBlocked();
+        return field.getSquareAt(position).isBlocked();
     }
 
-    public int playerCount() {
-        return players.size();
-    }
-
-    public Stream<Player> getActivePlayersStream() {
+    private Stream<Player> getActivePlayersStream() {
         return players.parallelStream().filter(Player::isActive);
     }
 
-    // check winning conditions
+    public boolean isFull() {
+        return players.size() == MAX_PLAYER_COUNT;
+    }
+
     public boolean isOver() {
         return getActivePlayersStream().count() < 2;
-    }
-
-    public List<Square> getChangedSquares() {
-        return changedSquares;
-    }
-
-    public List<Player> getPlayers() {
-        return players;
     }
 
     public Player getWinner() {
@@ -105,7 +119,7 @@ public class Game implements GameConstants {
         return winner;
     }
 
-    public Field getField() {
-        return field;
+    public List<Square> getUpdatedSquares() {
+        return updatedSquares;
     }
 }

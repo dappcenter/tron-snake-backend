@@ -8,13 +8,13 @@ public enum DirectionType {
     DOWN(0, 1),
     UP(0,-1);
 
-    MyVector direction;
+    MyVector value;
 
     DirectionType(int xDir, int yDir) {
-        this.direction = new MyVector(xDir, yDir);
+        this.value = new MyVector(xDir, yDir);
     }
 
-    public MyVector getDirection() {
-        return direction;
+    public MyVector getValue() {
+        return value;
     }
 }

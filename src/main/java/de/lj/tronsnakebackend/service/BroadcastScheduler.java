@@ -21,6 +21,14 @@ public class BroadcastScheduler extends ThreadPoolTaskScheduler {
         return future;
     }
 
+    @Override
+    public ScheduledFuture<?> scheduleWithFixedDelay(Runnable broadcast, long period) {
+        ScheduledFuture<?> future = super.scheduleWithFixedDelay(broadcast, period);
+        scheduledBroadcasts.put(broadcast, future);
+
+        return future;
+    }
+
     public void cancelBroadcast(Runnable broadcast) {
         scheduledBroadcasts.get(broadcast).cancel(true);
         scheduledBroadcasts.remove(broadcast);
