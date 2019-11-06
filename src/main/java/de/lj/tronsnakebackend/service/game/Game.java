@@ -15,9 +15,15 @@ public class Game implements GameConstants {
     private List<Player> players = new ArrayList<>();
     private List<Square> updatedSquares = new Vector<>();
 
+    private Integer playerCount;
+
+    public Game(Integer playerCount) {
+        this.playerCount = playerCount;
+    }
+
     public void addPlayer(Player player) {
         int index = players.size();
-        if (index < MAX_PLAYER_COUNT) {
+        if (index < playerCount) {
             MyVector position = STARTING_POSITIONS[index];
             MyVector direction = STARTING_DIRECTIONS[index].getValue();
             String color = SNAKE_COLORS[index];
@@ -104,7 +110,7 @@ public class Game implements GameConstants {
     }
 
     public boolean isFull() {
-        return players.size() == MAX_PLAYER_COUNT;
+        return players.size() == playerCount;
     }
 
     public boolean isOver() {
@@ -121,5 +127,9 @@ public class Game implements GameConstants {
 
     public List<Square> getUpdatedSquares() {
         return updatedSquares;
+    }
+
+    public Integer getPlayerCount() {
+        return playerCount;
     }
 }
