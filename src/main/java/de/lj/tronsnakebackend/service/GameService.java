@@ -71,8 +71,6 @@ public class GameService implements GameConstants {
     private synchronized void sendColorMessage(Client client, String color) {
         ColorDto colorDto = new ColorDto(color);
 
-        System.out.println("sending color to client: " + color);
-
         messagingTemplate.convertAndSendToUser(client.getSessionId(), "/client/get_color", colorDto, client.getMessageHeaders());
     }
 
@@ -166,6 +164,8 @@ public class GameService implements GameConstants {
         Game game = getPendingGame(playerCount);
         game.addPlayer(player);
         clientGameMap.put(client, game);
+
+        System.out.println("before sending color message to client");
 
         sendColorMessage(client, player.getSnake().getColor());
         sendSquareUpdateMessage(getClientsForGame(game), game.getUpdatedSquares());
