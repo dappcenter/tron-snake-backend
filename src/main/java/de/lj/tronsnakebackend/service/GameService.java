@@ -178,7 +178,7 @@ public class GameService implements GameConstants {
         List<Game> filtered_games = pendingGames.parallelStream()
                 .filter(game -> game.getPlayerCount() == playerCount)
                 .collect(Collectors.toList());
-        Game game = pendingGames.size() > 0 ? pendingGames.get(0) : new Game(playerCount);
+        Game game = filtered_games.size() > 0 ? filtered_games.get(0) : new Game(playerCount);
         if (!pendingGames.contains(game)) {
             pendingGames.add(game);
         }
