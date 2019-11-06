@@ -8,5 +8,6 @@ import lombok.ToString;
 @NoArgsConstructor
 @ToString
 public class JoinDto {
-    private String name;
+    private String playerName;
+    private Integer playerCount;
 }

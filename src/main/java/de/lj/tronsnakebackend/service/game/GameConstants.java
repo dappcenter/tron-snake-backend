@@ -15,8 +15,6 @@ public interface GameConstants {
     public static final int FIELD_HEIGHT = 45;
     public static final int FIELD_WIDTH = 35;
 
-    public static final int MAX_PLAYER_COUNT = 4;
-
     public static final String[] SNAKE_COLORS = new String[]{
         "blue", "red", "orange", "green"
     };

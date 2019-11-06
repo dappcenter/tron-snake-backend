@@ -39,7 +39,7 @@ public class GameController implements GameConstants {
 
     @MessageMapping("/join")
     public void joinGame(@Payload JoinDto joinDto, MessageHeaders messageHeaders, @Header(value = "simpSessionId") String sessionId) {
-        Client client = new Client(joinDto.getName(), messageHeaders, sessionId);
-        gameService.addPlayerForClient(client);
+        Client client = new Client(joinDto.getPlayerName(), messageHeaders, sessionId);
+        gameService.addPlayerForClient(client, joinDto.getPlayerCount());
     }
 }
