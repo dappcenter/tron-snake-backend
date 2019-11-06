@@ -165,10 +165,6 @@ public class GameService implements GameConstants {
         game.addPlayer(player);
         clientGameMap.put(client, game);
 
-        System.out.println("before sending color message to client");
-        System.out.println("playerCount: " + playerCount);
-        System.out.println("game.playerCount: " + game.getPlayerCount());
-
         sendColorMessage(client, player.getSnake().getColor());
         sendSquareUpdateMessage(getClientsForGame(game), game.getUpdatedSquares());
 
