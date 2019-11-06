@@ -155,13 +155,13 @@ public class GameService implements GameConstants {
         clientPlayerMap.get(client).setActive(false);
     }
 
-    public void addPlayerForClient(Client client) {
+    public void addPlayerForClient(Client client, Integer playerCount) {
         clients.add(client);
 
         Player player = new Human(client.getName());
         clientPlayerMap.put(client, player);
 
-        Game game = getPendingGame();
+        Game game = getPendingGame(playerCount);
         game.addPlayer(player);
         clientGameMap.put(client, game);
 
@@ -174,8 +174,11 @@ public class GameService implements GameConstants {
         }
     }
 
-    private Game getPendingGame() {
-        Game game = pendingGames.size() > 0 ? pendingGames.get(0) : new Game();
+    private Game getPendingGame(Integer playerCount) {
+        List<Game> filtered_games = pendingGames.parallelStream()
+                .filter(game -> game.getPlayerCount() == playerCount)
+                .collect(Collectors.toList());
+        Game game = pendingGames.size() > 0 ? pendingGames.get(0) : new Game(playerCount);
         if (!pendingGames.contains(game)) {
             pendingGames.add(game);
         }

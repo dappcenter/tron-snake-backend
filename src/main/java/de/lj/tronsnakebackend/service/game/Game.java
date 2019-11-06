@@ -128,4 +128,8 @@ public class Game implements GameConstants {
     public List<Square> getUpdatedSquares() {
         return updatedSquares;
     }
+
+    public Integer getPlayerCount() {
+        return playerCount;
+    }
 }
